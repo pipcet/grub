@@ -1,6 +1,6 @@
 #! /bin/sh
 # Print a version string.
-scriptversion=2021-06-28.06; # UTC
+scriptversion=2021-12-20.12; # UTC
 
 # Bootstrap this package from checked-out sources.
 
@@ -47,7 +47,7 @@ PERL="${PERL-perl}"
 
 me=$0
 
-default_gnulib_url=git://git.sv.gnu.org/gnulib
+default_gnulib_url=https://github.com/coreutils/gnulib
 
 usage() {
   cat <<EOF
