@@ -6,7 +6,12 @@ fs="$1"
 
 GRUBFSTEST="@builddir@/grub-fstest"
 
-tempdir=`mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX"` || exit 1
+tempdir=`mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX"` ||
+{ echo "Failed to make temporary directory"; exit 99; }
+
+# xorriso -as mkisofs options to ignore locale when processing file names and
+# FSLABEL. This is especially needed for the conversion to Joliet UCS-2.
+XORRISOFS_CHARSET="-input-charset UTF-8 -output-charset UTF-8"
 
 # This wrapper is to ease insertion of valgrind or time statistics
 run_it () {
@@ -54,7 +59,7 @@ case x"$fs" in
 	MINLOGSECSIZE=8
 	MAXLOGSECSIZE=12;;
     xbtrfs*)
-	MINLOGSECSIZE=8
+	MINLOGSECSIZE=12
 	    #  OS LIMITATION: It could go up to 32768 but Linux rejects sector sizes > 4096
 	MAXLOGSECSIZE=12;;
     xxfs)
@@ -121,8 +126,10 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 	    MAXBLKSIZE=4096
 	    ;;
 	xreiserfs*)
-	    MINBLKSIZE=512
-		# OS LIMITATION: 8192 isn't supported.
+	    # OS LIMITATION: mkreiserfs says block sizes smaller than 4 KiB are
+	    # not supported and bails. Its been this way since at least 2014.
+	    MINBLKSIZE=4096
+	    # OS LIMITATION: 8192 isn't supported.
 	    MAXBLKSIZE=4096
 	    ;;
 	x"mdraid"*)
@@ -194,7 +201,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		# OS LIMITATION: Linux rejects non-power-of-two blocks.
 		# OS LIMITATION: Linux rejects > 4096.
 	    MINBLKSIZE=1024
-	    MAXBLKSIZE=4096;;
+	    MAXBLKSIZE=1024;;
     esac
     if test "$BLKSTEP" -eq 0; then
 	blksizes="$(powrange "$MINBLKSIZE" "$MAXBLKSIZE")"
@@ -273,7 +280,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 	    done
 	    if test "$CFILESRC" = "" ; then
 		echo "Couldn't find compressible file" >&2
-		exit 1
+		exit 99
 	    fi
 	    case x"$fs" in
 		    # FS LIMITATION: 8.3 names
@@ -314,7 +321,8 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    FSLABEL="grub_;/testéтi u😁莽茝кириrewfceniuewruevrewnuuireurevueurnievrewfne";;
  	            # FS LIMITATION: afs and iso9660 label is at most 32 UTF-8 characters
 		x"afs" | xiso9660 | xrockridge | xrockridge_joliet\
-                     | xiso9660_1999 | xrockridge_1999 | xrockridge_joliet_1999)
+		     | xiso9660_1999 | xrockridge_1999\
+		     | xrockridge_joliet_1999 | xziso9660)
 		     FSLABEL="gr_;/é莭莽😁кирит u";;
  	            # FS LIMITATION: bfs label is at most 32 UTF-8 characters
  	            # OS LIMITATION: bfs label can't contain ; or /
@@ -335,9 +343,10 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 	    # FS LIMITATION: XFS label is at most 12 UTF-8 characters
 		x"xfs"|x"xfs_crc")
 		    FSLABEL="géт 😁к";;
-            # FS LIMITATION: FAT labels limited to 11 characters, no  international characters or lowercase
+            # FS LIMITATION: FAT labels limited to 11 characters, no international characters or lowercase
+	    # and excluding the restricted characters in "*?.,;:/\|+=<>[]"
 		x"vfat"* | xmsdos*)
-		    FSLABEL="GRUBTEST ;_";;
+		    FSLABEL="G~!@#\$%^&(_";;
 	    # FS LIMITATION: AFFS is latin1. At most 29 characters
 		x"affs" | xaffs_intl)
 		    FSLABEL="grub_tt? #*w;/e£@¡¤½¾{[]}<>.,";;
@@ -616,7 +625,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    mkdir -p "$MNTPOINTRO"
 		    for i in $(range 0 $((NDEVICES-1)) 1); do
 			dd if=/dev/zero of="$FSIMAGEP${i}.img" count=1 bs=1 seek=$((DISKSIZE-1)) &> /dev/null
-			LODEVICE=$(losetup --find --show "$FSIMAGEP${i}.img")
+			LODEVICE=$(losetup --find --show "$FSIMAGEP${i}.img") || exit 99
 			LODEVICES="$LODEVICES $LODEVICE"
 			if test "$i" = 0; then
 			    MOUNTDEVICE="$LODEVICE"
@@ -689,7 +698,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    "mkfs.minix" -v "${MOUNTDEVICE}"
 		    MOUNTFS="minix";;
 		x"minix3")
-		    "mkfs.minix" -B $BLKSIZE -3 "${MOUNTDEVICE}"
+		    "mkfs.minix" -3 "${MOUNTDEVICE}"
 		    MOUNTFS="minix";;
 		x"ntfs"*)
 		    "mkfs.ntfs" -s "$SECSIZE" -c "$BLKSIZE" -L "$FSLABEL" -Q -q "${MOUNTDEVICE}"
@@ -820,7 +829,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    "mkfs.xfs" -m crc=1 -b size=$BLKSIZE -s size=$SECSIZE -L "$FSLABEL" -q "${MOUNTDEVICE}" ;;
 		*)
 		    echo "Add appropriate mkfs command here"
-		    exit 1
+		    exit 99
 		    ;;
 	    esac
 	    BASEFILE="1.img"
@@ -923,10 +932,7 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 				sleep 1
 			    done
 			done
-			for i in $(range 0 $((NDEVICES-1)) 1); do
-			    rm "$FSIMAGEP${i}.img"
-			done
-			exit 1;
+			exit 99;
 		    fi
 		    ;;
 	    esac
@@ -1020,31 +1026,31 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    (cd "$MASTER"; find . | cpio -o -H "$(echo ${fs} | sed 's@^cpio_@@')" > "${FSIMAGEP}0.img" ) ;;
 		x"ziso9660")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso -compliance rec_mtime -set_filter_r --zisofs -- -zisofs default -as mkisofs -iso-level 3 -graft-points -R -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img"  -- -set_filter_r --zisofs -- -zisofs default -add /="$MASTER" ;;
+		    xorriso -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 3 -graft-points -R -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" -- -add /="$MASTER" -- -zisofs default -set_filter_r --zisofs / -- ;;
 		x"iso9660")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge off -compliance rec_mtime -as mkisofs -iso-level 3 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge off -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 3 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"joliet")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge off  -compliance rec_mtime -as mkisofs -iso-level 3 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge off  -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 3 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"rockridge")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge on -compliance rec_mtime -as mkisofs -iso-level 3 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge on -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 3 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"rockridge_joliet")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge on -compliance rec_mtime -as mkisofs -iso-level 3 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge on -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 3 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"iso9660_1999")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge off -compliance rec_mtime -as mkisofs -iso-level 4 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge off -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 4 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"joliet_1999")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge off  -compliance rec_mtime -as mkisofs -iso-level 4 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge off  -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 4 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"rockridge_1999")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge on -compliance rec_mtime -as mkisofs -iso-level 4 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge on -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 4 -graft-points -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"rockridge_joliet_1999")
 		    FSUUID=$(date -u +%Y-%m-%d-%H-%M-%S-00);
-		    xorriso --rockridge on -compliance rec_mtime -as mkisofs -iso-level 4 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
+		    xorriso --rockridge on -compliance rec_mtime -as mkisofs $XORRISOFS_CHARSET -iso-level 4 -graft-points -J -joliet-long -V "$FSLABEL" --modification-date=$(echo ${FSUUID} | sed 's/-//g;') -o "${FSIMAGEP}0.img" /="$MASTER"  ;;
 		x"romfs")
 		    genromfs -V "$FSLABEL" -f "${FSIMAGEP}0.img" -d "$MASTER" ;;
 		xsquash4_*)
@@ -1164,8 +1170,8 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 	    fi
 
 	    if [ x$NOFILETIME != xy ]; then
-		filtime=$(TZ=UTC ls --time-style=+%Y%m%d%H%M%S -l -d "$MNTPOINTRO/$OSDIR/$BASEFILE"|awk '{print $6; }')
-		if echo "$LSROUT" | grep -F "$filtime $BASEFILE" > /dev/null; then
+		filetime=$(TZ=UTC ls --time-style=+%Y%m%d%H%M%S -l -d "$MNTPOINTRO/$OSDIR/$BASEFILE"|awk '{print $6; }')
+		if echo "$LSROUT" | grep -F "$filetime $BASEFILE" > /dev/null; then
 		    :
 		else
 		    echo TIME FAIL
@@ -1174,8 +1180,8 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 		    exit 1
 		fi
 
-		filtime=$(TZ=UTC ls --time-style=+%Y%m%d%H%M%S -l -d "$MNTPOINTRO/$OSDIR/$LONGNAME"|awk '{print $6; }')
-		if echo "$LSROUT" | grep -F "$filtime $LONGNAME" > /dev/null; then
+		filetime=$(TZ=UTC ls --time-style=+%Y%m%d%H%M%S -l -d "$MNTPOINTRO/$OSDIR/$LONGNAME"|awk '{print $6; }')
+		if echo "$LSROUT" | grep -F "$filetime $LONGNAME" > /dev/null; then
 		    :
 		else
 		    echo LONG TIME FAIL
@@ -1351,6 +1357,12 @@ for LOGSECSIZE in $(range "$MINLOGSECSIZE" "$MAXLOGSECSIZE" 1); do
 			# With some abstractions like mdraid flushing to disk
 			# may be delayed for a long time.
 			FSTIME="$UMOUNT_TIME";;
+		    xsquash*)
+			# Creating the squash image may take more than a few
+			# seconds. Use the more accurate timestamp from the
+			# superblock.
+			FSTIME="$(unsquashfs -s "${FSIMAGEP}0.img" | grep ^Creation | awk '{print $6 " " $7 " " $8 " " $9 " " $10; }')"
+			FSTIME="$(date -d "$FSTIME" -u '+%Y-%m-%d %H:%M:%S')";;
 		    *)
 			FSTIME="$(TZ=UTC ls --time-style="+%Y-%m-%d_%H:%M:%S" -l -d "${FSIMAGEP}0.img"|awk '{print $6; }'|sed 's,_, ,g')";;
 		esac

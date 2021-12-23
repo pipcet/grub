@@ -798,6 +798,8 @@ fi
 
 # Force no alignment to save space on i386.
 if test "x$target_cpu" = xi386; then
+  TARGET_CFLAGS="$TARGET_CFLAGS -falign-functions=1"
+
   AC_CACHE_CHECK([whether -falign-loops works], [grub_cv_cc_falign_loop], [
     CFLAGS="$TARGET_CFLAGS -falign-loops=1 -Werror"
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
@@ -805,17 +807,19 @@ if test "x$target_cpu" = xi386; then
 	[grub_cv_cc_falign_loop=no])
   ])
 
-  AC_CACHE_CHECK([whether -malign-loops works], [grub_cv_cc_malign_loop], [
-    CFLAGS="$TARGET_CFLAGS -malign-loops=1 -Werror"
+  if test "x$grub_cv_cc_falign_loop" = xyes; then
+    TARGET_CFLAGS="$TARGET_CFLAGS -falign-loops=1"
+  fi
+
+  AC_CACHE_CHECK([whether -falign-jumps works], [grub_cv_cc_falign_jumps], [
+    CFLAGS="$TARGET_CFLAGS -falign-jumps=1 -Werror"
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
-        [grub_cv_cc_malign_loop=yes],
-	[grub_cv_cc_malign_loop=no])
+        [grub_cv_cc_falign_jumps=yes],
+        [grub_cv_cc_falign_jumps=no])
   ])
 
-  if test "x$grub_cv_cc_falign_loop" = xyes; then
-    TARGET_CFLAGS="$TARGET_CFLAGS -falign-jumps=1 -falign-loops=1 -falign-functions=1"
-  elif test "x$grub_cv_cc_malign_loop" = xyes; then
-    TARGET_CFLAGS="$TARGET_CFLAGS -malign-jumps=1 -malign-loops=1 -malign-functions=1"
+  if test "x$grub_cv_cc_falign_jumps" = xyes; then
+    TARGET_CFLAGS="$TARGET_CFLAGS -falign-jumps=1"
   fi
 fi
 
@@ -834,6 +838,20 @@ if ( test "x$target_cpu" = xi386 || test "x$target_cpu" = xx86_64 ) && test "x$p
   # Some toolchains enable these features by default, but they need
   # registers that aren't set up properly in GRUB.
   TARGET_CFLAGS="$TARGET_CFLAGS -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow"
+fi
+
+if ( test "x$target_cpu" = xi386 || test "x$target_cpu" = xx86_64 ); then
+  AC_CACHE_CHECK([whether -Wa,-mx86-used-note works], [grub_cv_cc_mx86_used_note], [
+    CFLAGS="$TARGET_CFLAGS -Wa,-mx86-used-note=no -Werror"
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
+	[grub_cv_cc_mx86_used_note=yes],
+	[grub_cv_cc_mx86_used_note=no])
+  ])
+
+  if test "x$grub_cv_cc_mx86_used_note" = xyes; then
+    TARGET_CFLAGS="$TARGET_CFLAGS -Wa,-mx86-used-note=no"
+    TARGET_CCASFLAGS="$TARGET_CCASFLAGS -Wa,-mx86-used-note=no"
+  fi
 fi
 
 # GRUB doesn't use float or doubles at all. Yet some toolchains may decide
