@@ -55,7 +55,7 @@ static grub_err_t
 grub_linux16_boot (void)
 {
   grub_uint16_t segment;
-  struct grub_relocator16_state state;
+  struct grub_relocator16_state state = {0};
 
   segment = grub_linux_real_target >> 4;
   state.gs = state.fs = state.es = state.ds = state.ss = segment;
@@ -67,7 +67,7 @@ grub_linux16_boot (void)
   grub_video_set_mode ("text", 0, 0);
 
   grub_stop_floppy ();
-  
+
   return grub_relocator16_boot (relocator, state);
 }
 

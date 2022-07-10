@@ -35,8 +35,6 @@ GRUB_MOD_LICENSE ("GPLv3+");
 #define LUKS_MAGIC_1ST "LUKS\xBA\xBE"
 #define LUKS_MAGIC_2ND "SKUL\xBA\xBE"
 
-#define MAX_PASSPHRASE 256
-
 enum grub_luks2_kdf_type
 {
   LUKS2_KDF_TYPE_ARGON2I,
@@ -348,14 +346,14 @@ luks2_read_header (grub_disk_t disk, grub_luks2_header_t *outhdr)
 }
 
 static grub_cryptodisk_t
-luks2_scan (grub_disk_t disk, const char *check_uuid, int check_boot)
+luks2_scan (grub_disk_t disk, grub_cryptomount_args_t cargs)
 {
   grub_cryptodisk_t cryptodisk;
   grub_luks2_header_t header;
   char uuid[sizeof (header.uuid) + 1];
   grub_size_t i, j;
 
-  if (check_boot)
+  if (cargs->check_boot)
     return NULL;
 
   if (luks2_read_header (disk, &header))
@@ -369,8 +367,11 @@ luks2_scan (grub_disk_t disk, const char *check_uuid, int check_boot)
       uuid[j++] = header.uuid[i];
   uuid[j] = '\0';
 
-  if (check_uuid && grub_strcasecmp (check_uuid, uuid) != 0)
-    return NULL;
+  if (cargs->search_uuid != NULL && grub_strcasecmp (cargs->search_uuid, uuid) != 0)
+    {
+      grub_dprintf ("luks2", "%s != %s\n", uuid, cargs->search_uuid);
+      return NULL;
+    }
 
   cryptodisk = grub_zalloc (sizeof (*cryptodisk));
   if (!cryptodisk)
@@ -389,7 +390,7 @@ luks2_verify_key (grub_luks2_digest_t *d, grub_uint8_t *candidate_key,
 {
   grub_uint8_t candidate_digest[GRUB_CRYPTODISK_MAX_KEYLEN];
   grub_uint8_t digest[GRUB_CRYPTODISK_MAX_KEYLEN], salt[GRUB_CRYPTODISK_MAX_KEYLEN];
-  grub_size_t saltlen = sizeof (salt), digestlen = sizeof (digest);
+  idx_t saltlen = sizeof (salt), digestlen = sizeof (digest);
   const gcry_md_spec_t *hash;
   gcry_err_code_t gcry_ret;
 
@@ -428,7 +429,7 @@ luks2_decrypt_key (grub_uint8_t *out_key,
   grub_uint8_t area_key[GRUB_CRYPTODISK_MAX_KEYLEN];
   grub_uint8_t salt[GRUB_CRYPTODISK_MAX_KEYLEN];
   grub_uint8_t *split_key = NULL;
-  grub_size_t saltlen = sizeof (salt);
+  idx_t saltlen = sizeof (salt);
   char cipher[32], *p;
   const gcry_md_spec_t *hash;
   gcry_err_code_t gcry_ret;
@@ -542,11 +543,11 @@ luks2_decrypt_key (grub_uint8_t *out_key,
 
 static grub_err_t
 luks2_recover_key (grub_disk_t source,
-		   grub_cryptodisk_t crypt)
+		   grub_cryptodisk_t crypt,
+		   grub_cryptomount_args_t cargs)
 {
   grub_uint8_t candidate_key[GRUB_CRYPTODISK_MAX_KEYLEN];
-  char passphrase[MAX_PASSPHRASE], cipher[32];
-  char *json_header = NULL, *part = NULL, *ptr;
+  char cipher[32], *json_header = NULL, *ptr;
   grub_size_t candidate_key_len = 0, json_idx, size;
   grub_luks2_header_t header;
   grub_luks2_keyslot_t keyslot;
@@ -555,6 +556,9 @@ luks2_recover_key (grub_disk_t source,
   gcry_err_code_t gcry_ret;
   grub_json_t *json = NULL, keyslots;
   grub_err_t ret;
+
+  if (cargs->key_data == NULL || cargs->key_len == 0)
+    return grub_error (GRUB_ERR_BAD_ARGUMENT, "no key data");
 
   ret = luks2_read_header (source, &header);
   if (ret)
@@ -578,18 +582,6 @@ luks2_recover_key (grub_disk_t source,
   if (ret)
     {
       ret = grub_error (GRUB_ERR_BAD_ARGUMENT, "Invalid LUKS2 JSON header");
-      goto err;
-    }
-
-  /* Get the passphrase from the user. */
-  if (source->partition)
-    part = grub_partition_get_name (source->partition);
-  grub_printf_ (N_("Enter passphrase for %s%s%s (%s): "), source->name,
-		source->partition ? "," : "", part ? : "",
-		crypt->uuid);
-  if (!grub_password_get (passphrase, MAX_PASSPHRASE))
-    {
-      ret = grub_error (GRUB_ERR_BAD_ARGUMENT, "Passphrase not supplied");
       goto err;
     }
 
@@ -717,7 +709,7 @@ luks2_recover_key (grub_disk_t source,
 	}
 
       ret = luks2_decrypt_key (candidate_key, source, crypt, &keyslot,
-			       (const grub_uint8_t *) passphrase, grub_strlen (passphrase));
+			       cargs->key_data, cargs->key_len);
       if (ret)
 	{
 	  grub_dprintf ("luks2", "Decryption with keyslot \"%" PRIuGRUB_UINT64_T "\" failed: %s\n",
@@ -769,7 +761,6 @@ luks2_recover_key (grub_disk_t source,
     }
 
  err:
-  grub_free (part);
   grub_free (json_header);
   grub_json_free (json);
   return ret;

@@ -376,7 +376,7 @@ grub_disk_read_small_real (grub_disk_t disk, grub_disk_addr_t sector,
     tmp_buf = grub_malloc (num << disk->log_sector_size);
     if (!tmp_buf)
       return grub_errno;
-    
+
     if ((disk->dev->disk_read) (disk, transform_sector (disk, aligned_sector),
 				num, tmp_buf))
       {
@@ -402,10 +402,10 @@ grub_disk_read_small (grub_disk_t disk, grub_disk_addr_t sector,
   if (err)
     return err;
   if (disk->read_hook)
-    (disk->read_hook) (sector + (offset >> GRUB_DISK_SECTOR_BITS),
-		       offset & (GRUB_DISK_SECTOR_SIZE - 1),
-		       size, disk->read_hook_data);
-  return GRUB_ERR_NONE;
+    err = (disk->read_hook) (sector + (offset >> GRUB_DISK_SECTOR_BITS),
+			     offset & (GRUB_DISK_SECTOR_SIZE - 1),
+			     size, buf, disk->read_hook_data);
+  return err;
 }
 
 /* Read data from the disk.  */
@@ -490,7 +490,7 @@ grub_disk_read (grub_disk_t disk, grub_disk_addr_t sector,
 					buf);
 	  if (err)
 	    return err;
-	  
+
 	  for (i = 0; i < agglomerate; i ++)
 	    grub_disk_cache_store (disk->dev->id, disk->id,
 				   sector + (i << GRUB_DISK_CACHE_BITS),
@@ -501,11 +501,11 @@ grub_disk_read (grub_disk_t disk, grub_disk_addr_t sector,
 
 	  if (disk->read_hook)
 	    (disk->read_hook) (sector, 0, agglomerate << (GRUB_DISK_CACHE_BITS + GRUB_DISK_SECTOR_BITS),
-			       disk->read_hook_data);
+			       buf, disk->read_hook_data);
 
 	  sector += agglomerate << GRUB_DISK_CACHE_BITS;
 	  size -= agglomerate << (GRUB_DISK_CACHE_BITS + GRUB_DISK_SECTOR_BITS);
-	  buf = (char *) buf 
+	  buf = (char *) buf
 	    + (agglomerate << (GRUB_DISK_CACHE_BITS + GRUB_DISK_SECTOR_BITS));
 	}
 
@@ -513,7 +513,7 @@ grub_disk_read (grub_disk_t disk, grub_disk_addr_t sector,
 	{
 	  if (disk->read_hook)
 	    (disk->read_hook) (sector, 0, (GRUB_DISK_CACHE_SIZE << GRUB_DISK_SECTOR_BITS),
-			       disk->read_hook_data);
+			       buf, disk->read_hook_data);
 	  sector += GRUB_DISK_CACHE_SIZE;
 	  buf = (char *) buf + (GRUB_DISK_CACHE_SIZE << GRUB_DISK_SECTOR_BITS);
 	  size -= (GRUB_DISK_CACHE_SIZE << GRUB_DISK_SECTOR_BITS);

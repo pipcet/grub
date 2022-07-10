@@ -77,6 +77,7 @@ This edition documents version @value{VERSION}.
 * Coding style::
 * Finding your way around::
 * Contributing Changes::
+* Setting up and running test suite::
 * Updating External Code::
 * Porting::
 * Error Handling::
@@ -95,8 +96,8 @@ This edition documents version @value{VERSION}.
 @node Getting the source code
 @chapter Getting the source code
 
-GRUB is maintained using the @uref{GIT revision
-control system}.  To fetch:
+GRUB is maintained using the @uref{https://git-scm.com/book/en/v2,
+GIT revision control system}.  To fetch:
 
 @example
 git clone git://git.sv.gnu.org/grub.git
@@ -345,8 +346,8 @@ manual and try GRUB 2 out to see what you think is missing from there.
 
 Here are additional pointers:
 @itemize
-@item @url{https://savannah.gnu.org/task/?group=grub GRUB's Task Tracker}
-@item @url{https://savannah.gnu.org/bugs/?group=grub GRUB's Bug Tracker}
+@item @uref{https://savannah.gnu.org/task/?group=grub, GRUB's Task Tracker}
+@item @uref{https://savannah.gnu.org/bugs/?group=grub, GRUB's Bug Tracker}
 @end itemize
 
 If you intended to make changes to GRUB Legacy (<=0.97) those are not accepted
@@ -460,7 +461,7 @@ and the FSF clerks have dealt with your copyright assignment.
 @section When you are approved for write access to project's files
 
 As you might know, GRUB is hosted on
-@url{https://savannah.gnu.org/projects/grub Savannah}, thus the membership
+@uref{https://savannah.gnu.org/projects/grub, Savannah}, thus the membership
 is managed by Savannah. This means that, if you want to be a member of this
 project:
 
@@ -482,6 +483,17 @@ right to the repository, both for a legal reason and for a technical reason.
 If your intention is to just get started, please do not submit a inclusion
 request. Instead, please subscribe to the mailing list, and communicate first
 (e.g. sending a patch, asking a question, commenting on another message...).
+
+@node Setting up and running test suite
+@chapter Setting up and running test suite
+
+GRUB is basically a tiny operating system with read support for many file
+systems and which has been ported to a variety of architectures. As such, its
+test suite has quite a few dependencies required to fully run the suite.
+These dependencies are currently documented in the
+@uref{https://git.savannah.gnu.org/cgit/grub.git/tree/INSTALL, INSTALL}
+file in the source repository. Once installed, the test suite can be started
+by running the @command{make check} command from the GRUB build directory.
 
 @node Updating External Code
 @chapter Updating external code
@@ -575,12 +587,12 @@ To upgrade to a new version of the miniLZO library, download the release
 tarball and copy the files into the target directory:
 
 @example
-curl -L -O http://www.oberhumer.com/opensource/lzo/download/minilzo-2.08.tar.gz
-tar -zxf minilzo-2.08.tar.gz
-rm minilzo-2.08/testmini.c
+curl -L -O https://www.oberhumer.com/opensource/lzo/download/minilzo-2.10.tar.gz
+tar -zxf minilzo-2.10.tar.gz
+rm minilzo-2.10/testmini.c
 rm -r grub-core/lib/minilzo/*
-cp minilzo-2.08/*.[hc] grub-core/lib/minilzo
-rm -r minilzo-2.08*
+cp minilzo-2.10/*.[hc] grub-core/lib/minilzo
+rm -r minilzo-2.10*
 @end example
 
 @node Porting
@@ -806,13 +818,13 @@ If it works next stage is to have heap, console and timer.
 
 To have the heap working you need to determine which regions are suitable for
 heap usage, allocate them from firmware and map (if applicable). Then call
-grub_mm_init_region (vois *start, grub_size_t s) for every of this region.
+grub_mm_init_region (void *start, grub_size_t s) for every of this region.
 As a shortcut for early port you can allocate right after _end or have
 a big static array for heap. If you do you'll probably need to come back to
 this later. As for output console you should distinguish between an array of
 text, terminfo or graphics-based console. Many of real-world examples don't
 fit perfectly into any of these categories but one of the models is easier
-to be used as base. In second and third case you should add your platform to 
+to be used as base. In second and third case you should add your platform to
 terminfokernel respectively videoinkernel group. A good example of array of
 text is i386-pc (kern/i386/pc/init.c and term/i386/pc/console.c).
 Of terminfo is ieee1275 (kern/ieee1275/init.c and term/ieee1275/console.c).
@@ -1769,7 +1781,7 @@ use in GRUB at this time:
 @item BDF 
 Inefficient storage; uses ASCII to describe properties and 
 hexadecimal numbers in ASCII for the bitmap rows.
-@item PCF  
+@item PCF
 Many format variations such as byte order and bitmap padding (rows
 padded to byte, word, etc.) would result in more complex code to
 handle the font format.
@@ -1890,8 +1902,8 @@ bit in the byte.  For the sake of compact storage, rows are not padded
 to byte boundaries (i.e., a single byte may contain bits belonging to
 multiple rows).  The last byte of the bitmap @strong{is} padded with zero
 bits in the bits positions to the right of the last used bit if the
-bitmap data does not fill the last byte.  
-         
+bitmap data does not fill the last byte.
+
 The length of the @strong{bitmap data} field is (@var{width} * @var{height} + 7) / 8
 using integer arithmetic, which is equivalent to ceil(@var{width} *
 @var{height} / 8) using real number arithmetic.

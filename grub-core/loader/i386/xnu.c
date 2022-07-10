@@ -805,14 +805,14 @@ grub_cpu_xnu_fill_devicetree (grub_uint64_t *fsbfreq_out)
 grub_err_t
 grub_xnu_boot_resume (void)
 {
-  struct grub_relocator32_state state;
+  struct grub_relocator32_state state = {0};
 
   state.esp = grub_xnu_stack;
   state.ebp = grub_xnu_stack;
   state.eip = grub_xnu_entry_point;
   state.eax = grub_xnu_arg1;
 
-  return grub_relocator32_boot (grub_xnu_relocator, state, 0); 
+  return grub_relocator32_boot (grub_xnu_relocator, state, 0);
 }
 
 /* Setup video for xnu. */
@@ -912,7 +912,7 @@ grub_xnu_set_video (struct grub_xnu_boot_params_common *params)
   params->lfb_line_len = mode_info.pitch;
 
   params->lfb_base = (grub_addr_t) framebuffer;
-  params->lfb_mode = bitmap ? GRUB_XNU_VIDEO_SPLASH 
+  params->lfb_mode = bitmap ? GRUB_XNU_VIDEO_SPLASH
     : GRUB_XNU_VIDEO_TEXT_IN_VIDEO;
 
   return GRUB_ERR_NONE;
@@ -960,7 +960,7 @@ grub_xnu_boot (void)
   grub_addr_t devtree_target;
   grub_size_t devtreelen;
   int i;
-  struct grub_relocator32_state state;
+  struct grub_relocator32_state state = {0};
   grub_uint64_t fsbfreq = 100000000;
   int v2 = (grub_xnu_darwin_version >= 11);
   grub_uint32_t efi_system_table = 0;
@@ -1069,7 +1069,7 @@ grub_xnu_boot (void)
   if (v2)
     bootparams->v2.efi_system_table = (grub_addr_t) grub_autoefi_system_table;
   else
-    bootparams->v1.efi_system_table = (grub_addr_t) grub_autoefi_system_table;  
+    bootparams->v1.efi_system_table = (grub_addr_t) grub_autoefi_system_table;
 
   firstruntimepage = (((grub_addr_t) grub_xnu_heap_target_start
 		       + grub_xnu_heap_size + GRUB_XNU_PAGESIZE - 1)

@@ -5,7 +5,8 @@ This is the GRUB.  Welcome.
 This file contains instructions for compiling and installing the GRUB.
 
 Where this document refers to packages names, they are named according to the
-Debian 11 package repositories.
+Debian 11 package repositories. These packages can be found by searching
+https://packages.debian.org/.
 
 The Requirements
 ================
@@ -35,7 +36,6 @@ For optional grub-emu features, you need:
 
 * SDL (recommended)
 * libpciaccess (optional)
-* libusb (optional)
 
 To build GRUB's graphical terminal (gfxterm), you need:
 
@@ -46,12 +46,13 @@ If you use a development snapshot or want to hack on GRUB you may
 need the following.
 
 * Python 3 (NOTE: python 2.6 should still work, but it's not tested)
-* Autoconf 2.63 or later
-* Automake 1.11 or later
+* Autoconf 2.64 or later
+* Automake 1.14 or later
 
 Your distro may package cross-compiling toolchains such as the following
 incomplete list on Debian: gcc-aarch64-linux-gnu, gcc-arm-linux-gnueabihf,
-gcc-mipsel-linux-gnu, and mingw-w64.
+gcc-mips-linux-gnu, gcc-mipsel-linux-gnu, gcc-powerpc64-linux-gnu,
+gcc-riscv64-linux-gnu, gcc-sparc64-linux-gnu, mingw-w64 and mingw-w64-tools.
 
 More cross compiling toolchains can be found at the following trusted sites:
 
@@ -88,6 +89,10 @@ Prerequisites for make-check:
 Note that `make check' will run and many tests may complete successfully
 with only a subset of these prerequisites. However, some tests may be
 skipped or fail due to missing prerequisites.
+
+To build the documentation you'll need:
+* texinfo, for the info and html documentation
+* texlive, for building the dvi and pdf documentation (optional)
 
 Configuring the GRUB
 ====================
@@ -145,7 +150,10 @@ The simplest way to compile this package is:
   8. Type `make install' to install the programs and any data files and
      documentation.
 
-  9. You can remove the program binaries and object files from the
+  9. Type `make html' or `make pdf' to generate the html or pdf
+     documentation.  Note, these are not built by default.
+
+ 10. You can remove the program binaries and object files from the
      source code directory by typing `make clean'.  To also remove the
      files that `configure' created (so you can compile the package for
      a different kind of computer), type `make distclean'.  There is
@@ -181,14 +189,19 @@ For this example the configure line might look like (more details below)
 (some options are optional and included here for completeness but some rarely
 used options are omitted):
 
-  ./configure --host=x86_64-linux-gnu --target=arm-linux-gnueabihf \
-    --with-platform=efi BUILD_CC=gcc BUILD_PKG_CONFIG=pkg-config \
+  ./configure --build=sparc64-freebsd --host=x86_64-linux-gnu \
+    --target=arm-linux-gnueabihf --with-platform=efi \
+    BUILD_CC=gcc BUILD_PKG_CONFIG=pkg-config \
     HOST_CC=x86_64-linux-gnu-gcc HOST_CFLAGS='-g -O2' \
     PKG_CONFIG=x86_64-linux-gnu-pkg-config TARGET_CC=arm-linux-gnueabihf-gcc \
     TARGET_CFLAGS='-Os -march=armv8.3-a' TARGET_CCASFLAGS='-march=armv8.3-a' \
     TARGET_OBJCOPY=arm-linux-gnueabihf-objcopy \
     TARGET_STRIP=arm-linux-gnueabihf-strip TARGET_NM=arm-linux-gnueabihf-nm \
     TARGET_RANLIB=arm-linux-gnueabihf-ranlib LEX=flex
+
+Note, that the autoconf 2.65 manual states that when using the --host argument
+to configure, the --build argument should be specified as well. Not sending
+--build, enters a compatibility mode that will be removed in the future.
 
 Normally, for building a GRUB on amd64 with tools to run on amd64 to
 generate images to run on ARM, using your Linux distribution's
@@ -201,13 +214,14 @@ version look at prerequisites. All tools not mentioned in this section under
 corresponding platform are not needed for the platform in question.
 
   - For build
-    1. BUILD_CC= to gcc able to compile for build. This is used, for
+    1. --build= to autoconf name of build.
+    2. BUILD_CC= to gcc able to compile for build. This is used, for
        example, to compile build-gentrigtables which is then run to
        generate sin and cos tables.
-    2. BUILD_CFLAGS= for C options for build.
-    3. BUILD_CPPFLAGS= for C preprocessor options for build.
-    4. BUILD_LDFLAGS= for linker options for build.
-    5. BUILD_PKG_CONFIG= for pkg-config for build (optional).
+    3. BUILD_CFLAGS= for C options for build.
+    4. BUILD_CPPFLAGS= for C preprocessor options for build.
+    5. BUILD_LDFLAGS= for linker options for build.
+    6. BUILD_PKG_CONFIG= for pkg-config for build (optional).
 
   - For host
     1. --host= to autoconf name of host.
@@ -244,7 +258,6 @@ corresponding platform are not needed for the platform in question.
   - Additionally for emu, for host and target.
     1. SDL is looked for in standard linker directories (-lSDL) (optional)
     2. libpciaccess is looked for in standard linker directories (-lpciaccess) (optional)
-    3. libusb is looked for in standard linker directories (-lusb) (optional)
 
   - Platform-agnostic tools and data.
     1. make is the tool you execute after ./configure.

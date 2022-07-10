@@ -284,6 +284,11 @@
     { 0x9a, 0x3a, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d } \
   }
 
+#define GRUB_EFI_IMAGE_SECURITY_DATABASE_GUID \
+  { 0xd719b2cb, 0x3d3a, 0x4596, \
+    { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f } \
+  }
+
 #define GRUB_EFI_MEMORY_TYPE_INFORMATION_GUID \
   { 0x4c19049f, 0x4137, 0x4dd3, \
     { 0x9c, 0x10, 0x8b, 0x97, 0xa8, 0x3f, 0xfd, 0xfa } \
@@ -426,7 +431,7 @@ struct grub_efi_sal_system_table_translation_register_descriptor
 struct grub_efi_sal_system_table_purge_translation_coherence
 {
   grub_uint8_t type;
-  grub_uint8_t reserved[3];  
+  grub_uint8_t reserved[3];
   grub_uint32_t ndomains;
   grub_uint64_t coherence;
 };
@@ -903,6 +908,15 @@ struct grub_efi_sata_device_path
 } GRUB_PACKED;
 typedef struct grub_efi_sata_device_path grub_efi_sata_device_path_t;
 
+#define GRUB_EFI_VLAN_DEVICE_PATH_SUBTYPE		20
+
+struct grub_efi_vlan_device_path
+{
+  grub_efi_device_path_t header;
+  grub_efi_uint16_t vlan_id;
+} GRUB_PACKED;
+typedef struct grub_efi_vlan_device_path grub_efi_vlan_device_path_t;
+
 #define GRUB_EFI_VENDOR_MESSAGING_DEVICE_PATH_SUBTYPE	10
 
 /* Media Device Path.  */
@@ -1196,7 +1210,7 @@ struct grub_efi_boot_services
   (*exit) (grub_efi_handle_t image_handle,
 	   grub_efi_status_t exit_status,
 	   grub_efi_uintn_t exit_data_size,
-	   grub_efi_char16_t *exit_data) __attribute__((noreturn));
+	   grub_efi_char16_t *exit_data);
 
   grub_efi_status_t
   (*unload_image) (grub_efi_handle_t image_handle);

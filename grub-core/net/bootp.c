@@ -244,6 +244,7 @@ grub_net_configure_by_dhcp_ack (const char *name,
 
   addr.type = GRUB_NET_NETWORK_LEVEL_PROTOCOL_IPV4;
   addr.ipv4 = bp->your_ip;
+  addr.option = 0;
 
   if (device)
     *device = 0;
@@ -416,7 +417,7 @@ grub_net_configure_by_dhcp_ack (const char *name,
   opt = find_dhcp_option (bp, size, GRUB_NET_BOOTP_EXTENSIONS_PATH, &opt_len);
   if (opt && opt_len)
     grub_env_set_net_property (name, "extensionspath", (const char *) opt, opt_len);
-  
+
   opt = find_dhcp_option (bp, size, GRUB_NET_BOOTP_CLIENT_ID, &opt_len);
   if (opt && opt_len)
     grub_env_set_net_property (name, "clientid", (const char *) opt, opt_len);
@@ -825,7 +826,7 @@ grub_cmd_bootp (struct grub_command *cmd __attribute__ ((unused)),
 	return grub_errno;
       }
     ifaces[j].address.type = GRUB_NET_NETWORK_LEVEL_PROTOCOL_DHCP_RECV;
-    grub_memcpy (&ifaces[j].hwaddress, &card->default_address, 
+    grub_memcpy (&ifaces[j].hwaddress, &card->default_address,
 		 sizeof (ifaces[j].hwaddress));
     ifaces[j].dhcp_tmo = ifaces[j].dhcp_tmo_left = 1;
     j++;

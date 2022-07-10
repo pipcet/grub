@@ -836,22 +836,29 @@ use difficult disk access methods like ahci. Hence GRUB will warn if attempted
 to install into small MBR gap except in a small number of configurations
 that were grandfathered. The grandfathered config must:
 
-* use biosdisk as disk access module for @file{/boot}
-* not use any additional partition maps to access @file{/boot}
-* @file{/boot} must be on one of following filesystems:
-   * AFFS, AFS, BFS, cpio, newc, odc, ext2/3/4, FAT, exFAT,
+@itemize @bullet
+@item
+use biosdisk as disk access module for @file{/boot}
+
+@item
+not use any additional partition maps to access @file{/boot}
+
+@item
+@file{/boot} must be on one of following filesystems:
+   AFFS, AFS, BFS, cpio, newc, odc, ext2/3/4, FAT, exFAT,
    F2FS, HFS, uncompressed HFS+, ISO9660, JFS, Minix, Minix2, Minix3, NILFS2,
    NTFS, ReiserFS, ROMFS, SFS, tar, UDF, UFS1, UFS2, XFS
+@end itemize
 
 MBR gap has few technical problems.  There is no way to reserve space in
 the embedding area with complete safety, and some proprietary software is
 known to use it to make it difficult for users to work around licensing
-restrictions. GRUB works it around by detecting sectors by other software and
+restrictions. GRUB works around it by detecting sectors by other software and
 avoiding them and protecting its own sectors using Reed-Solomon encoding.
 
-GRUB team recommends having MBR gap of at least 1000 KiB
+GRUB team recommends having MBR gap of at least 1000 KiB.
 
-Should it be not possible GRUB has support for a fallback solution which is
+Should it not be possible, GRUB has support for a fallback solution which is
 heavily recommended against. Installing to a filesystem means that GRUB is
 vulnerable to its blocks being moved around by filesystem features such as
 tail packing, or even by aggressive fsck implementations, so this approach
@@ -998,13 +1005,14 @@ kopenbsd payload this is disabled by default. Aditionally behaviour of
 initial ramdisk depends on command line options. Several distributors provide
 the image for this purpose or it's integrated in their standard ramdisk and
 activated by special option. Consult your kernel and distribution manual for
-more details. Other loaders like appleloader, chainloader (BIOS, EFI, coreboot),
-freedos, ntldr and plan9 provide no possibility of loading initial ramdisk and
+more details. Other loaders like @command{appleloader}, @command{chainloader}
+(BIOS, EFI, coreboot), @command{freedos}, @command{ntldr}, @command{plan9}
+and @command{truecrypt} provide no possibility of loading initial ramdisk and
 as far as author is aware the payloads in question don't support either initial
 ramdisk or discovering loopback boot in other way and as such not bootable this
 way. Please consider alternative boot methods like copying all files
 from the image to actual partition. Consult your OS documentation for
-more details
+more details.
 
 @node LVM cache booting
 @section Booting from LVM cache logical volume
@@ -1781,18 +1789,20 @@ of the last command that executes.  If the expansion of the items following
 status is 0.
 
 @item if @var{list}; then @var{list}; [elif @var{list}; then @var{list};] @dots{} [else @var{list};] fi
-The @code{if} @var{list} is executed.  If its exit status is zero, the
-@code{then} @var{list} is executed.  Otherwise, each @code{elif} @var{list}
-is executed in turn, and if its exit status is zero, the corresponding
-@code{then} @var{list} is executed and the command completes.  Otherwise,
-the @code{else} @var{list} is executed, if present.  The exit status is the
-exit status of the last command executed, or zero if no condition tested
-true.
+The @code{if} @var{list} is executed, where @var{list} is a series of
+@dfn{simple command}s separated by a ";".  If its exit status of the last
+command is zero, the @code{then} @var{list} is executed.  Otherwise, each
+@code{elif} @var{list} is executed in turn, and if its last command's exit
+status is zero, the corresponding @code{then} @var{list} is executed and the
+command completes. Otherwise, the @code{else} @var{list} is executed, if
+present.  The exit status is the exit status of the last command executed, or
+zero if no condition tested true.
 
 @item while @var{cond}; do @var{list}; done
 @itemx until @var{cond}; do @var{list}; done
 The @code{while} command continuously executes the @code{do} @var{list} as
-long as the last command in @var{cond} returns an exit status of zero.  The
+long as the last command in @var{cond} returns an exit status of zero, where
+@var{cond} is a list of @dfn{simple command}s separated by a ";".  The
 @code{until} command is identical to the @code{while} command, except that
 the test is negated; the @code{do} @var{list} is executed as long as the
 last command in @var{cond} returns a non-zero exit status.  The exit status
@@ -2604,6 +2614,12 @@ The network interface's IP address.  Read-only.
 @item net_@var{<interface>}_mac
 The network interface's MAC address.  Read-only.
 
+@item net_@var{<interface>}_clientid
+The client id provided by DHCP.  Read-only.
+
+@item net_@var{<interface>}_clientuuid
+The client uuid provided by DHCP.  Read-only.
+
 @item net_@var{<interface>}_hostname
 The client host name provided by DHCP.  Read-only.
 
@@ -3011,6 +3027,39 @@ environment variable @samp{net_default_server} is used.
 Before using the network drive, you must initialize the network.
 @xref{Network}, for more information.
 
+For the @samp{http} network protocol, @code{@var{server}} may specify a
+port number other than the default value of @samp{80}. The server name
+and port number are separated by either @samp{,} or @samp{:}.
+For IPv6 addresses, the server name and port number may only be separated
+by @samp{,}.
+
+@itemize @bullet
+@item
+@code{(http,@var{server},@var{port})}
+
+@item
+@code{(http,@var{server}:@var{port})}
+@end itemize
+
+These examples all reference an @samp{http} server at address
+@samp{192.0.2.1} listening on the non-standard port of @samp{3000}.
+In these examples, the DNS name @samp{grub.example.com} is resolved
+to @samp{192.0.2.1}.
+
+@example
+(http,grub.example.com,3000)
+(http,grub.example.com:3000)
+(http,192.0.2.1,3000)
+(http,192.0.2.1:3000)
+@end example
+
+Referencing an @samp{http} server over IPv6 on the non-standard
+port of @samp{3000} would look like this:
+
+@example
+(http,2001:db8::1,3000)
+@end example
+
 If you boot GRUB from a CD-ROM, @samp{(cd)} is available. @xref{Making
 a GRUB bootable CD-ROM}, for details.
 
@@ -3236,9 +3285,12 @@ These variables have special meaning to GRUB.
 * icondir::
 * lang::
 * locale_dir::
+* lockdown::
 * menu_color_highlight::
 * menu_color_normal::
 * net_@var{<interface>}_boot_file::
+* net_@var{<interface>}_clientid::
+* net_@var{<interface>}_clientuuid::
 * net_@var{<interface>}_dhcp_server_name::
 * net_@var{<interface>}_domain::
 * net_@var{<interface>}_extensionspath::
@@ -3257,6 +3309,7 @@ These variables have special meaning to GRUB.
 * pxe_default_gateway::
 * pxe_default_server::
 * root::
+* shim_lock::
 * superusers::
 * theme::
 * timeout::
@@ -3388,9 +3441,16 @@ processed by commands @command{configfile} (@pxref{configfile}) or @command{norm
 @subsection debug
 
 This variable may be set to enable debugging output from various components
-of GRUB.  The value is a list of debug facility names separated by
-whitespace or @samp{,}, or @samp{all} to enable all available debugging
-output. The facility names are the first argument to grub_dprintf. Consult
+of GRUB. The value is an ordered list of debug facility names separated by
+whitespace or @samp{,}. If the special facility named @samp{all} is present
+then debugging output of all facility names is enabled at the start of
+processing the value of this variable. A facility's debug output can then be
+disabled by prefixing its name with a @samp{-}. The last occurence facility
+name with or without a leading @samp{-} takes precendent over any previous
+occurence. This allows the easy enabling or disabling of facilities by
+appending a @samp{,} and then the facility name with or without the leading
+@samp{-}, which will preserve the state of the rest of the facilities.
+The facility names are the first argument to grub_dprintf. Consult the
 source for more details.
 
 
@@ -3544,6 +3604,13 @@ default for this variable if internationalization is needed and any
 translation files are available.
 
 
+@node lockdown
+@subsection lockdown
+
+If this variable is set to @samp{y}, it means that GRUB has entered
+@pxref{Lockdown} mode.
+
+
 @node menu_color_highlight
 @subsection menu_color_highlight
 
@@ -3569,6 +3636,18 @@ The default is the value of @samp{color_normal} (@pxref{color_normal}).
 
 @node net_@var{<interface>}_boot_file
 @subsection net_@var{<interface>}_boot_file
+
+@xref{Network}.
+
+
+@node net_@var{<interface>}_clientid
+@subsection net_@var{<interface>}_clientid
+
+@xref{Network}.
+
+
+@node net_@var{<interface>}_clientuuid
+@subsection net_@var{<interface>}_clientuuid
 
 @xref{Network}.
 
@@ -3693,6 +3772,13 @@ disk, then @samp{prefix} might be set to @samp{(hd0,msdos1)/boot/grub} and
 @samp{root} to @samp{hd0,msdos1}.
 
 
+@node shim_lock
+@subsection shim_lock
+
+If this variable is set to @samp{y}, it means that the shim_lock verifier
+is registered (see @pxref{UEFI secure boot and shim}).
+
+
 @node superusers
 @subsection superusers
 
@@ -3780,9 +3866,11 @@ shell}.
 
 @menu
 * Menu-specific commands::
+* Loader commands::
 * General commands::
 * Command-line and menu entry commands::
 * Networking commands::
+* Undocumented commands::
 @end menu
 
 
@@ -3864,6 +3952,157 @@ the entries within this submenu.
 
 All options are the same as in the @command{menuentry} command
 (@pxref{menuentry}).
+@end deffn
+
+
+@node Loader commands
+@section The list of various loader commands
+
+These commands are used to load necessary components to boot desired OS.
+Many of the loader commands are not sufficiently documented. The following is
+a list of commands that could use more documentation:
+
+@itemize @bullet
+@item @command{appleloader} -  Boot BIOS-based system.
+@item @command{freedos} - Load FreeDOS kernel.sys.
+@item @command{kfreebsd_loadenv} - Load FreeBSD env.
+@item @command{kfreebsd_module_elf} - Load FreeBSD kernel module (ELF).
+@item @command{kfreebsd_module} - Load FreeBSD kernel module.
+@item @command{kfreebsd} - Load kernel of FreeBSD.
+@item @command{knetbsd_module_elf} - Load NetBSD kernel module (ELF).
+@item @command{knetbsd_module} - Load NetBSD kernel module.
+@item @command{knetbsd} - Load kernel of NetBSD.
+@item @command{kopenbsd} - Load kernel of OpenBSD.
+@item @command{kopenbsd_ramdisk} -  Load kOpenBSD ramdisk.
+@item @command{legacy_initrd_nounzip} - Simulate grub-legacy `modulenounzip' command
+@item @command{legacy_initrd} - Simulate grub-legacy `initrd' command
+@item @command{legacy_kernel} - Simulate grub-legacy `kernel' command
+@item @command{module2} - Load a multiboot 2 module.
+@item @command{module} - Load a multiboot module.
+@item @command{multiboot2} - Load a multiboot 2 kernel.
+@item @command{multiboot} - Load a multiboot kernel.
+@item @command{ntldr} - Load NTLDR or BootMGR.
+@item @command{plan9} - Load Plan9 kernel.
+@item @command{pxechainloader} - Load a PXE image.
+@item @command{truecrypt} - Load Truecrypt ISO.
+@item @command{xnu_kernel64} - Load 64-bit XNU image.
+@item @command{xnu_kernel} - Load XNU image.
+@item @command{xnu_kextdir} -  Load XNU extension directory.
+@item @command{xnu_kext} - Load XNU extension.
+@item @command{xnu_mkext} - Load XNU extension package.
+@item @command{xnu_ramdisk} -  Load XNU ramdisk. It will be available in OS as md0.
+@item @command{xnu_resume} - Load an image of hibernated XNU.
+@item @command{xnu_splash} - Load a splash image for XNU.
+@end itemize
+
+
+@menu
+* chainloader::                 Chain-load another boot loader
+* initrd::                      Load a Linux initrd
+* initrd16::                    Load a Linux initrd (16-bit mode)
+* linux::                       Load a Linux kernel
+* linux16::                     Load a Linux kernel (16-bit mode)
+@comment * xen_*::              Xen boot commands for AArch64
+* xen_hypervisor::              Load xen hypervisor binary (only on AArch64)
+* xen_module::                  Load xen modules for xen hypervisor (only on AArch64)
+@end menu
+
+
+@node chainloader
+@subsection chainloader
+
+@deffn Command chainloader [@option{--force}] file
+Load @var{file} as a chain-loader. Like any other file loaded by the
+filesystem code, it can use the blocklist notation (@pxref{Block list
+syntax}) to grab the first sector of the current partition with @samp{+1}.
+If you specify the option @option{--force}, then load @var{file} forcibly,
+whether it has a correct signature or not. This is required when you want to
+load a defective boot loader, such as SCO UnixWare 7.1.
+@end deffn
+
+
+@node initrd
+@subsection initrd
+
+@deffn Command initrd file [file @dots{}]
+Load, in order, all initial ramdisks for a Linux kernel image, and set
+the appropriate parameters in the Linux setup area in memory.  This may only
+be used after the @command{linux} command (@pxref{linux}) has been run.  See
+also @ref{GNU/Linux}.
+@end deffn
+
+
+@node initrd16
+@subsection initrd16
+
+@deffn Command initrd16 file [file @dots{}]
+Load, in order, all initial ramdisks for a Linux kernel image to be booted in
+16-bit mode, and set the appropriate parameters in the Linux setup area in
+memory.  This may only be used after the @command{linux16} command
+(@pxref{linux16}) has been run.  See also @ref{GNU/Linux}.
+
+This command is only available on x86 systems.
+@end deffn
+
+
+@node linux
+@subsection linux
+
+@deffn Command linux file @dots{}
+Load a Linux kernel image from @var{file}.  The rest of the line is passed
+verbatim as the @dfn{kernel command-line}.  Any initrd must be reloaded
+after using this command (@pxref{initrd}).
+
+On x86 systems, the kernel will be booted using the 32-bit boot protocol.
+Note that this means that the @samp{vga=} boot option will not work; if you
+want to set a special video mode, you will need to use GRUB commands such as
+@samp{set gfxpayload=1024x768} or @samp{set gfxpayload=keep} (to keep the
+same mode as used in GRUB) instead.  GRUB can automatically detect some uses
+of @samp{vga=} and translate them to appropriate settings of
+@samp{gfxpayload}.  The @command{linux16} command (@pxref{linux16}) avoids
+this restriction.
+@end deffn
+
+
+@node linux16
+@subsection linux16
+
+@deffn Command linux16 file @dots{}
+Load a Linux kernel image from @var{file} in 16-bit mode.  The rest of the
+line is passed verbatim as the @dfn{kernel command-line}.  Any initrd must
+be reloaded after using this command (@pxref{initrd16}).
+
+The kernel will be booted using the traditional 16-bit boot protocol.  As
+well as bypassing problems with @samp{vga=} described in @ref{linux}, this
+permits booting some other programs that implement the Linux boot protocol
+for the sake of convenience.
+
+This command is only available on x86 systems.
+@end deffn
+
+
+@node xen_hypervisor
+@subsection xen_hypervisor
+
+@deffn Command xen_hypervisor file  [arguments] @dots{}
+Load a Xen hypervisor binary from @var{file}. The rest of the line is passed
+verbatim as the @dfn{kernel command-line}. Any other binaries must be
+reloaded after using this command.
+This command is only available on AArch64 systems.
+@end deffn
+
+
+@node xen_module
+@subsection xen_module
+
+@deffn Command xen_module [--nounzip] file [arguments]
+Load a module for xen hypervisor at the booting process of xen.
+The rest of the line is passed verbatim as the module command line.
+Modules should be loaded in the following order:
+ - dom0 kernel image
+ - dom0 ramdisk if present
+ - XSM policy if present
+This command is only available on AArch64 systems.
 @end deffn
 
 
@@ -3984,7 +4223,6 @@ you forget a command, you can run the command @command{help}
 * blocklist::                   Print a block list
 * boot::                        Start up your operating system
 * cat::                         Show the contents of a file
-* chainloader::                 Chain-load another boot loader
 * clear::                       Clear the screen
 * cmosclean::                   Clear bit in CMOS
 * cmosdump::                    Dump CMOS contents
@@ -4008,12 +4246,8 @@ you forget a command, you can run the command @command{help}
 * halt::                        Shut down your computer
 * hashsum::                     Compute or check hash checksum
 * help::                        Show help messages
-* initrd::                      Load a Linux initrd
-* initrd16::                    Load a Linux initrd (16-bit mode)
 * insmod::                      Insert a module
 * keystatus::                   Check key modifier status
-* linux::                       Load a Linux kernel
-* linux16::                     Load a Linux kernel (16-bit mode)
 * list_env::                    List variables in environment block
 * list_trusted::                List trusted public keys
 * load_env::                    Load variables from environment block
@@ -4055,10 +4289,7 @@ you forget a command, you can run the command @command{help}
 @comment * vbeinfo::                     List available video modes
 * verify_detached::             Verify detached digital signature
 * videoinfo::                   List available video modes
-@comment * xen_*::              Xen boot commands for AArch64
 * wrmsr::                       Write values to model-specific registers
-* xen_hypervisor::              Load xen hypervisor binary (only on AArch64)
-* xen_module::                  Load xen modules for xen hypervisor (only on AArch64)
 @end menu
 
 
@@ -4196,19 +4427,6 @@ endings.
 @end deffn
 
 
-@node chainloader
-@subsection chainloader
-
-@deffn Command chainloader [@option{--force}] file
-Load @var{file} as a chain-loader. Like any other file loaded by the
-filesystem code, it can use the blocklist notation (@pxref{Block list
-syntax}) to grab the first sector of the current partition with @samp{+1}.
-If you specify the option @option{--force}, then load @var{file} forcibly,
-whether it has a correct signature or not. This is required when you want to
-load a defective boot loader, such as SCO UnixWare 7.1.
-@end deffn
-
-
 @node clear
 @subsection clear
 
@@ -4307,12 +4525,25 @@ Alias for @code{hashsum --hash crc32 arg @dots{}}. See command @command{hashsum}
 @node cryptomount
 @subsection cryptomount
 
-@deffn Command cryptomount device|@option{-u} uuid|@option{-a}|@option{-b}
-Setup access to encrypted device. If necessary, passphrase
-is requested interactively. Option @var{device} configures specific grub device
+@deffn Command cryptomount [ [@option{-p} password] | [@option{-k} keyfile [@option{-O} keyoffset] [@option{-S} keysize] ] ] [@option{-H} file] device|@option{-u} uuid|@option{-a}|@option{-b}
+Setup access to encrypted device. A passphrase will be requested interactively,
+if neither the @option{-p} nor @option{-k} options are given. The option
+@option{-p} can be used to supply a passphrase (useful for scripts).
+Alternatively the @option{-k} option can be used to supply a keyfile with
+options @option{-O} and @option{-S} optionally supplying the offset and size,
+respectively, of the key data in the given key file. The @option{-H} options can
+be used to supply cryptomount backends with an alternative header file (aka
+detached header). Not all backends have headers nor support alternative header
+files (currently only LUKS1 and LUKS2 support them).
+Argument @var{device} configures specific grub device
 (@pxref{Naming convention}); option @option{-u} @var{uuid} configures device
 with specified @var{uuid}; option @option{-a} configures all detected encrypted
 devices; option @option{-b} configures all geli containers that have boot flag set.
+
+Devices are not allowed to be given as key files nor as detached header files.
+However, this limitation can be worked around by using blocklist syntax. So
+for instance, @code{(hd1,gpt2)} can not be used, but @code{(hd1,gpt2)0+} will
+achieve the desired result.
 
 GRUB suports devices encrypted using LUKS, LUKS2 and geli. Note that necessary
 modules (@var{luks}, @var{luks2} and @var{geli}) have to be loaded manually
@@ -4406,6 +4637,8 @@ For example:
 @example
 drivemap -s (hd0) (hd1)
 @end example
+
+NOTE: Only available on i386-pc.
 @end deffn
 
 
@@ -4514,10 +4747,10 @@ type are omitted, then the partition will be inactive.
 @node halt
 @subsection halt
 
-@deffn Command halt @option{--no-apm}
-The command halts the computer. If the @option{--no-apm} option
-is specified, no APM BIOS call is performed. Otherwise, the computer
-is shut down using APM.
+@deffn Command halt [@option{--no-apm}[
+The command halts the computer. On the i386-pc target, the @option{--no-apm}
+option, or short @option{-n}, is specified, no APM BIOS call is performed.
+Otherwise, the computer is shut down using APM on that target.
 @end deffn
 
 
@@ -4558,30 +4791,6 @@ about each of the commands whose names begin with those @var{patterns}.
 @end deffn
 
 
-@node initrd
-@subsection initrd
-
-@deffn Command initrd file [file @dots{}]
-Load, in order, all initial ramdisks for a Linux kernel image, and set
-the appropriate parameters in the Linux setup area in memory.  This may only
-be used after the @command{linux} command (@pxref{linux}) has been run.  See
-also @ref{GNU/Linux}.
-@end deffn
-
-
-@node initrd16
-@subsection initrd16
-
-@deffn Command initrd16 file [file @dots{}]
-Load, in order, all initial ramdisks for a Linux kernel image to be booted in
-16-bit mode, and set the appropriate parameters in the Linux setup area in
-memory.  This may only be used after the @command{linux16} command
-(@pxref{linux16}) has been run.  See also @ref{GNU/Linux}.
-
-This command is only available on x86 systems.
-@end deffn
-
-
 @node insmod
 @subsection insmod
 
@@ -4601,42 +4810,6 @@ control over behaviour without having to wait for a keypress.
 Checking key modifier status is only supported on some platforms. If invoked
 without any options, the @command{keystatus} command returns true if and
 only if checking key modifier status is supported.
-@end deffn
-
-
-@node linux
-@subsection linux
-
-@deffn Command linux file @dots{}
-Load a Linux kernel image from @var{file}.  The rest of the line is passed
-verbatim as the @dfn{kernel command-line}.  Any initrd must be reloaded
-after using this command (@pxref{initrd}).
-
-On x86 systems, the kernel will be booted using the 32-bit boot protocol.
-Note that this means that the @samp{vga=} boot option will not work; if you
-want to set a special video mode, you will need to use GRUB commands such as
-@samp{set gfxpayload=1024x768} or @samp{set gfxpayload=keep} (to keep the
-same mode as used in GRUB) instead.  GRUB can automatically detect some uses
-of @samp{vga=} and translate them to appropriate settings of
-@samp{gfxpayload}.  The @command{linux16} command (@pxref{linux16}) avoids
-this restriction.
-@end deffn
-
-
-@node linux16
-@subsection linux16
-
-@deffn Command linux16 file @dots{}
-Load a Linux kernel image from @var{file} in 16-bit mode.  The rest of the
-line is passed verbatim as the @dfn{kernel command-line}.  Any initrd must
-be reloaded after using this command (@pxref{initrd16}).
-
-The kernel will be booted using the traditional 16-bit boot protocol.  As
-well as bypassing problems with @samp{vga=} described in @ref{linux}, this
-permits booting some other programs that implement the Linux boot protocol
-for the sake of convenience.
-
-This command is only available on x86 systems.
 @end deffn
 
 
@@ -5001,7 +5174,7 @@ unbootable. @xref{Using digital signatures}, for more information.
 
 @deffn Command search @
  [@option{--file}|@option{--label}|@option{--fs-uuid}] @
- [@option{--set} [var]] [@option{--no-floppy}] name
+ [@option{--set} [var]] [@option{--no-floppy}|@option{--efidisk-only}] name
 Search devices by file (@option{-f}, @option{--file}), filesystem label
 (@option{-l}, @option{--label}), or filesystem UUID (@option{-u},
 @option{--fs-uuid}).
@@ -5012,6 +5185,9 @@ set as the value of environment variable @var{var}. The default variable is
 
 The (@option{-n}, @option{--no-floppy}) option prevents searching floppy
 devices, which can be slow.
+
+The (@option{--efidisk-only}) option prevents searching any other devices then
+EFI disks. This is typically used when chainloading to local EFI partition.
 
 The @samp{search.file}, @samp{search.fs_label}, and @samp{search.fs_uuid}
 commands are aliases for @samp{search --file}, @samp{search --label}, and
@@ -5044,7 +5220,9 @@ Insert keystrokes into the keyboard buffer when booting.  Sometimes an
 operating system or chainloaded boot loader requires particular keys to be
 pressed: for example, one might need to press a particular key to enter
 "safe mode", or when chainloading another boot loader one might send
-keystrokes to it to navigate its menu.  
+keystrokes to it to navigate its menu.
+
+Note: This command is currently only available on the i386-pc target.
 
 You may provide up to 16 keystrokes (the length of the BIOS keyboard
 buffer).  Keystroke names may be upper-case or lower-case letters, digits,
@@ -5470,29 +5648,6 @@ Note: The command is not allowed when lockdown is enforced (@pxref{Lockdown}).
       This is done to prevent subverting various security mechanisms.
 @end deffn
 
-@node xen_hypervisor
-@subsection xen_hypervisor
-
-@deffn Command xen_hypervisor file  [arguments] @dots{}
-Load a Xen hypervisor binary from @var{file}. The rest of the line is passed
-verbatim as the @dfn{kernel command-line}. Any other binaries must be
-reloaded after using this command.
-This command is only available on AArch64 systems.
-@end deffn
-
-@node xen_module
-@subsection xen_module
-
-@deffn Command xen_module [--nounzip] file [arguments]
-Load a module for xen hypervisor at the booting process of xen.
-The rest of the line is passed verbatim as the module command line.
-Modules should be loaded in the following order:
- - dom0 kernel image
- - dom0 ramdisk if present
- - XSM policy if present
-This command is only available on AArch64 systems.
-@end deffn
-
 @node Networking commands
 @section The list of networking commands
 
@@ -5512,6 +5667,7 @@ This command is only available on AArch64 systems.
 * net_ls_dns::                  List DNS servers
 * net_ls_routes::               List routing entries
 * net_nslookup::                Perform a DNS lookup
+* net_set_vlan::                Set vlan id on an interface
 @end menu
 
 
@@ -5686,6 +5842,125 @@ List routing entries.
 Resolve address of @var{name} using DNS server @var{server}. If no server
 is given, use default list of servers.
 @end deffn
+
+
+@node net_set_vlan
+@subsection net_set_vlan
+
+@deffn Command net_set_vlan @var{interface} @var{vlanid}
+Set the 802.1Q VLAN identifier on @var{interface} to @var{vlanid}. For example,
+to set the VLAN identifier on interface @samp{efinet1} to @samp{100}:
+
+@example
+net_set_vlan efinet1 100
+@end example
+
+The VLAN identifier can be removed by setting it to @samp{0}:
+
+@example
+net_set_vlan efinet1 0
+@end example
+@end deffn
+
+
+@node Undocumented commands
+@section The list of commands currently undocumented
+Unfortunately, not all GRUB commands are documented at this time due to
+developer resource constraints. One way to contribute back to the GRUB
+project would be to help document these commands, and submit patches or
+ideas to the mailing list. The following is a (most likely incomplete)
+list of undocumented or poorly documented commands and not all of them
+are allowed for all platforms. Running the command help from within the
+GRUB shell may provide more information on parameters and usage.
+
+@itemize @bullet
+@item @command{all_functional_test} - Run all functional tests.
+@item @command{backtrace} - Print backtrace.
+@item @command{boottime} - Show boot time statistics.
+@item @command{cacheinfo} - Get disk cache info.
+@item @command{cbmemc} - Show CBMEM console content.
+@item @command{cmosset} -  Set bit at BYTE:BIT in CMOS.
+@item @command{coreboot_boottime} - Show coreboot boot time statistics.
+@item @command{dump} - Show memory contents.
+@item @command{efiemu_loadcore} - Load and initialize EFI emulator.
+@item @command{efiemu_prepare} - Finalize loading of EFI emulator.
+@item @command{efiemu_unload} - Unload EFI emulator.
+@item @command{exit} - Exit from GRUB.
+@item @command{extract_entries_configfile} - Load another config file but take only menu entries.
+@item @command{extract_entries_source} - Load another config file without changing context but take only menu entries.
+@item @command{extract_legacy_entries_configfile} - Parse legacy config in new context taking only menu entries
+@item @command{extract_legacy_entries_source} - Parse legacy config in same context taking only menu entries
+@item @command{extract_syslinux_entries_configfile} - Execute syslinux config in new context taking only menu entries
+@item @command{extract_syslinux_entries_source} - Execute syslinux config in same context taking only menu entries
+@item @command{fakebios} - Create BIOS-like structures for backward compatibility with existing OS.
+@item @command{file} - Check if FILE is of specified type.
+@item @command{fix_video} - Fix video problem.
+@item @command{fpswa} - Display FPSWA version.
+@item @command{functional_test} - Run all loaded functional tests.
+@item @command{fwsetup} - Reboot into firmware setup menu.
+@item @command{gdbstub_break} - Break into GDB
+@item @command{gdbstub} -  Start GDB stub on given port
+@item @command{gdbstub_stop} - Stop GDB stub
+@item @command{hdparm} - Get/set ATA disk parameters.
+@item @command{hexdump} - Show raw contents of a file or memory.
+@item @command{hexdump_random} - Hexdump random data.
+@item @command{inb} - Read 8-bit value from PORT.
+@item @command{inl} - Read 32-bit value from PORT.
+@item @command{inw} - Read 16-bit value from PORT.
+@item @command{jpegtest} - Tests loading of JPEG bitmap.
+@item @command{keymap} - Load a keyboard layout.
+@item @command{legacy_check_password} - Simulate grub-legacy `password' command in menu entry mode
+@item @command{legacy_configfile} - Parse legacy config in new context
+@item @command{legacy_password} - Simulate grub-legacy `password' command
+@item @command{legacy_source} -  Parse legacy config in same context
+@item @command{loadbios} - Load BIOS dump.
+@item @command{lsacpi} - Show ACPI information.
+@item @command{lsapm} - Show APM information.
+@item @command{lscoreboot} - List coreboot tables.
+@item @command{lsdev} - List devices.
+@item @command{lsefi} - Display EFI handles.
+@item @command{lsefimmap} - Display EFI memory map.
+@item @command{lsefisystab} - Display EFI system tables.
+@item @command{lsmmap} - List memory map provided by firmware.
+@item @command{lspci} - List PCI devices.
+@item @command{lssal} - Display SAL system table.
+@item @command{lsspd} - Print Memory information.
+@item @command{macppcbless} - Bless DIR of HFS or HFS+ partition for PPC macs.
+@item @command{mactelbless} - Bless FILE of HFS or HFS+ partition for intel macs.
+@item @command{net_set_vlan} - Set an interface's vlan id.
+@item @command{outb} - Write 8-bit VALUE to PORT.
+@item @command{outl} - Write 32-bit VALUE to PORT.
+@item @command{outw} - Write 16-bit VALUE to PORT.
+@item @command{pcidump} - Show raw dump of the PCI configuration space.
+@item @command{pngtest} - Tests loading of PNG bitmap.
+@item @command{read_byte} - Read 8-bit value from ADDR.
+@item @command{read_dword} - Read 32-bit value from ADDR.
+@item @command{read_word} - Read 16-bit value from ADDR.
+@item @command{setpci} - Manipulate PCI devices.
+@item @command{suspend} - Return to IEEE1275 prompt.
+@item @command{syslinux_configfile} - Execute syslinux config in new context
+@item @command{syslinux_source} - Execute syslinux config in same context
+@item @command{test_blockarg} - Print and execute block argument., 0
+@item @command{testload} - Load the same file in multiple ways.
+@item @command{testspeed} - Test file read speed.
+@item @command{tgatest} - Tests loading of TGA bitmap.
+@item @command{time} - Measure time used by COMMAND
+@item @command{tr} - Translate SET1 characters to SET2 in STRING.
+@item @command{usb} - Test USB support.
+@item @command{vbeinfo} - List available video modes. If resolution is given show only modes matching it.
+@item @command{vbetest} - Test video subsystem.
+@item @command{videotest} - Test video subsystem in mode WxH.
+@item @command{write_byte} - Write 8-bit VALUE to ADDR.
+@item @command{write_dword} - Write 32-bit VALUE to ADDR.
+@item @command{write_word} - Write 16-bit VALUE to ADDR.
+@item @command{xen_cat} - List Xen storage.
+@item @command{xen_ls} - List Xen storage.
+@item @command{xnu_devprop_load} - Load `device-properties' dump.
+@item @command{xnu_uuid} - Transform 64-bit UUID to format suitable for XNU. If -l is given keep it lowercase as done by blkid.
+@item @command{zfs-bootfs} - Print ZFS-BOOTFSOBJ or store it into VARIABLE
+@item @command{zfsinfo} - Print ZFS info about DEVICE.
+@item @command{zfskey} - Import ZFS wrapping key stored in FILE.
+@end itemize
 
 
 @node Internationalisation

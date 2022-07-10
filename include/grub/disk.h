@@ -60,7 +60,7 @@ struct grub_disk_memberlist;
 #endif
 
 typedef enum
-  { 
+  {
     GRUB_DISK_PULL_NONE,
     GRUB_DISK_PULL_REMOVABLE,
     GRUB_DISK_PULL_RESCAN,
@@ -110,9 +110,9 @@ extern grub_disk_dev_t EXPORT_VAR (grub_disk_dev_list);
 
 struct grub_partition;
 
-typedef void (*grub_disk_read_hook_t) (grub_disk_addr_t sector,
-				       unsigned offset, unsigned length,
-				       void *data);
+typedef grub_err_t (*grub_disk_read_hook_t) (grub_disk_addr_t sector,
+					     unsigned offset, unsigned length,
+					     char *buf, void *data);
 
 /* Disk.  */
 struct grub_disk
@@ -181,6 +181,8 @@ typedef struct grub_disk_memberlist *grub_disk_memberlist_t;
 
 /* Return value of grub_disk_native_sectors() in case disk size is unknown. */
 #define GRUB_DISK_SIZE_UNKNOWN	 0xffffffffffffffffULL
+
+#define GRUB_DISK_KiB_TO_SECTORS(x) ((x) << (10 - GRUB_DISK_SECTOR_BITS))
 
 /* Convert sector number from one sector size to another. */
 static inline grub_disk_addr_t

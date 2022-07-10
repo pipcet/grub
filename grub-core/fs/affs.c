@@ -345,7 +345,7 @@ grub_affs_create_node (grub_fshelp_node_t dir,
   if (len > sizeof (fil->name))
     len = sizeof (fil->name);
   *grub_latin1_to_utf8 (name_u8, fil->name, len) = '\0';
-  
+
   (*node)->di = *fil;
   for (nest = 0; nest < 8; nest++)
     {
@@ -370,17 +370,26 @@ grub_affs_create_node (grub_fshelp_node_t dir,
 				  GRUB_DISK_SECTOR_SIZE - GRUB_AFFS_FILE_LOCATION,
 				  sizeof ((*node)->di), (char *) &(*node)->di);
 	    if (err)
-	      return 1;
+	      {
+		grub_free (*node);
+		return 1;
+	      }
 	    continue;
 	  }
 	default:
-	  return 0;
+	  {
+	    grub_free (*node);
+	    return 0;
+	  }
 	}
       break;
     }
 
   if (nest == 8)
-    return 0;
+    {
+      grub_free (*node);
+      return 0;
+    }
 
   type |= GRUB_FSHELP_CASE_INSENSITIVE;
 
@@ -408,7 +417,7 @@ grub_affs_iterate_dir (grub_fshelp_node_t dir,
   node = orig_node = grub_zalloc (sizeof (*node));
   if (!node)
     return 1;
-    
+
   *node = *dir;
   if (hook (".", GRUB_FSHELP_DIR, node, hook_data))
     return 1;

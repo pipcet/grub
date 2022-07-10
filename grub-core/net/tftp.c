@@ -157,7 +157,7 @@ tftp_receive (grub_net_udp_socket_t sock __attribute__ ((unused)),
     {
     case TFTP_OACK:
       data->block_size = TFTP_DEFAULTSIZE_PACKET;
-      data->have_oack = 1; 
+      data->have_oack = 1;
       for (ptr = nb->data + sizeof (tftph->opcode); ptr < nb->tail;)
 	{
 	  if (grub_memcmp (ptr, "tsize\0", sizeof ("tsize\0") - 1) == 0)
@@ -251,9 +251,9 @@ tftp_receive (grub_net_udp_socket_t sock __attribute__ ((unused)),
       return GRUB_ERR_NONE;
     case TFTP_ERROR:
       data->have_oack = 1;
-      grub_netbuff_free (nb);
       grub_error (GRUB_ERR_IO, "%s", tftph->u.err.errmsg);
       grub_error_save (&data->save_err);
+      grub_netbuff_free (nb);
       return GRUB_ERR_NONE;
     default:
       grub_netbuff_free (nb);
@@ -400,6 +400,7 @@ tftp_open (struct grub_file *file, const char *filename)
     {
       grub_net_udp_close (data->sock);
       grub_free (data);
+      file->data = NULL;
       return grub_errno;
     }
 
@@ -460,7 +461,7 @@ tftp_packets_pulled (struct grub_file *file)
   return ack (data, data->block);
 }
 
-static struct grub_net_app_protocol grub_tftp_protocol = 
+static struct grub_net_app_protocol grub_tftp_protocol =
   {
     .name = "tftp",
     .open = tftp_open,

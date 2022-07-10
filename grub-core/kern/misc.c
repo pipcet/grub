@@ -113,9 +113,29 @@ grub_printf (const char *fmt, ...)
   va_list ap;
   int ret;
 
+#if defined(MM_DEBUG) && !defined(GRUB_UTIL) && !defined (GRUB_MACHINE_EMU)
+  /*
+   * To prevent infinite recursion when grub_mm_debug is on, disable it
+   * when calling grub_vprintf(). One such call loop is:
+   *   grub_vprintf() -> parse_printf_args() -> parse_printf_arg_fmt() ->
+   *     grub_debug_calloc() -> grub_printf() -> grub_vprintf().
+   */
+  int grub_mm_debug_save = 0;
+
+  if (grub_mm_debug)
+    {
+      grub_mm_debug_save = grub_mm_debug;
+      grub_mm_debug = 0;
+    }
+#endif
+
   va_start (ap, fmt);
   ret = grub_vprintf (fmt, ap);
   va_end (ap);
+
+#if defined(MM_DEBUG) && !defined(GRUB_UTIL) && !defined (GRUB_MACHINE_EMU)
+  grub_mm_debug = grub_mm_debug_save;
+#endif
 
   return ret;
 }
@@ -162,16 +182,49 @@ __attribute__ ((alias("grub_printf")));
 int
 grub_debug_enabled (const char * condition)
 {
-  const char *debug;
+  const char *debug, *found;
+  grub_size_t clen;
+  int ret = 0;
 
   debug = grub_env_get ("debug");
   if (!debug)
     return 0;
 
-  if (grub_strword (debug, "all") || grub_strword (debug, condition))
-    return 1;
+  if (grub_strword (debug, "all"))
+    {
+      if (debug[3] == '\0')
+	return 1;
+      ret = 1;
+    }
 
-  return 0;
+  clen = grub_strlen (condition);
+  found = debug-1;
+  while(1)
+    {
+      found = grub_strstr (found+1, condition);
+
+      if (found == NULL)
+	break;
+
+      /* Found condition is not a whole word, so ignore it. */
+      if (*(found + clen) != '\0' && *(found + clen) != ','
+	 && !grub_isspace (*(found + clen)))
+	continue;
+
+      /*
+       * If found condition is at the start of debug or the start is on a word
+       * boundary, then enable debug. Else if found condition is prefixed with
+       * '-' and the start is on a word boundary, then disable debug. If none
+       * of these cases, ignore.
+       */
+      if (found == debug || *(found - 1) == ',' || grub_isspace (*(found - 1)))
+	ret = 1;
+      else if (*(found - 1) == '-' && ((found == debug + 1) || (*(found - 2) == ','
+			       || grub_isspace (*(found - 2)))))
+	ret = 0;
+    }
+
+  return ret;
 }
 
 void
@@ -1200,7 +1253,7 @@ static void __attribute__ ((noreturn))
 grub_abort (void)
 {
   grub_printf ("\nAborted.");
-  
+
 #ifndef GRUB_UTIL
   if (grub_term_inputs)
 #endif
@@ -1255,7 +1308,7 @@ grub_real_boot_time (const char *file,
   n->next = 0;
 
   va_start (args, fmt);
-  n->msg = grub_xvasprintf (fmt, args);    
+  n->msg = grub_xvasprintf (fmt, args);
   va_end (args);
 
   *boot_time_last = n;

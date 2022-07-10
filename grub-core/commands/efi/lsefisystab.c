@@ -44,6 +44,7 @@ static const struct guid_mapping guid_mappings[] =
     { GRUB_EFI_DXE_SERVICES_TABLE_GUID, "DXE SERVICES"},
     { GRUB_EFI_HCDP_TABLE_GUID, "HCDP"},
     { GRUB_EFI_HOB_LIST_GUID, "HOB LIST"},
+    { GRUB_EFI_IMAGE_SECURITY_DATABASE_GUID, "IMAGE EXECUTION INFORMATION"},
     { GRUB_EFI_LZMA_CUSTOM_DECOMPRESS_GUID, "LZMA CUSTOM DECOMPRESS"},
     { GRUB_EFI_MEMORY_TYPE_INFORMATION_GUID, "MEMORY TYPE INFO"},
     { GRUB_EFI_MPS_TABLE_GUID, "MPS"},
@@ -72,7 +73,7 @@ grub_cmd_lsefisystab (struct grub_command *cmd __attribute__ ((unused)),
     char *vendor;
     grub_uint16_t *vendor_utf16;
     grub_printf ("Vendor: ");
-    
+
     for (vendor_utf16 = st->firmware_vendor; *vendor_utf16; vendor_utf16++);
     /* Allocate extra 3 bytes to simplify math. */
     vendor = grub_calloc (4, vendor_utf16 - st->firmware_vendor + 1);
@@ -99,7 +100,7 @@ grub_cmd_lsefisystab (struct grub_command *cmd __attribute__ ((unused)),
 		   t->vendor_guid.data3);
       for (j = 0; j < 8; j++)
 	grub_printf ("%02x", t->vendor_guid.data4[j]);
-      
+
       for (j = 0; j < ARRAY_SIZE (guid_mappings); j++)
 	if (grub_memcmp (&guid_mappings[j].guid, &t->vendor_guid,
 			 sizeof (grub_efi_guid_t)) == 0)
@@ -115,7 +116,7 @@ static grub_command_t cmd;
 
 GRUB_MOD_INIT(lsefisystab)
 {
-  cmd = grub_register_command ("lsefisystab", grub_cmd_lsefisystab, 
+  cmd = grub_register_command ("lsefisystab", grub_cmd_lsefisystab,
 			       "", "Display EFI system tables.");
 }
 

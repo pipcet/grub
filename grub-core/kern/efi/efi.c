@@ -117,6 +117,14 @@ grub_efi_open_protocol (grub_efi_handle_t handle,
   return interface;
 }
 
+grub_efi_status_t
+grub_efi_close_protocol (grub_efi_handle_t handle, grub_efi_guid_t *protocol)
+{
+  grub_efi_boot_services_t *b = grub_efi_system_table->boot_services;
+
+  return efi_call_4 (b->close_protocol, handle, protocol, grub_efi_image_handle, NULL);
+}
+
 int
 grub_efi_set_text_mode (int on)
 {
@@ -211,7 +219,7 @@ grub_efi_set_variable(const char *var, const grub_efi_guid_t *guid,
 
   r = grub_efi_system_table->runtime_services;
 
-  status = efi_call_5 (r->set_variable, var16, guid, 
+  status = efi_call_5 (r->set_variable, var16, guid,
 		       (GRUB_EFI_VARIABLE_NON_VOLATILE
 			| GRUB_EFI_VARIABLE_BOOTSERVICE_ACCESS
 			| GRUB_EFI_VARIABLE_RUNTIME_ACCESS),
@@ -822,6 +830,13 @@ grub_efi_print_device_path (grub_efi_device_path_t *dp)
 			     sata->hba_port,
 			     sata->multiplier_port,
 			     sata->lun);
+	      }
+	      break;
+	    case GRUB_EFI_VLAN_DEVICE_PATH_SUBTYPE:
+	      {
+		grub_efi_vlan_device_path_t *vlan;
+		vlan = (grub_efi_vlan_device_path_t *) dp;
+		grub_printf ("/Vlan(%u)", vlan->vlan_id);
 	      }
 	      break;
 

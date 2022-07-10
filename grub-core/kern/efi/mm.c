@@ -38,9 +38,8 @@
    a multiplier of 4KB.  */
 #define MEMORY_MAP_SIZE	0x3000
 
-/* The minimum and maximum heap size for GRUB itself.  */
-#define MIN_HEAP_SIZE	0x100000
-#define MAX_HEAP_SIZE	(1600 * 0x100000)
+/* The default heap size for GRUB itself in bytes.  */
+#define DEFAULT_HEAP_SIZE	0x100000
 
 static void *finish_mmap_buf = 0;
 static grub_efi_uintn_t finish_mmap_size = 0;
@@ -478,29 +477,13 @@ filter_memory_map (grub_efi_memory_descriptor_t *memory_map,
   return filtered_desc;
 }
 
-/* Return the total number of pages.  */
-static grub_efi_uint64_t
-get_total_pages (grub_efi_memory_descriptor_t *memory_map,
-		 grub_efi_uintn_t desc_size,
-		 grub_efi_memory_descriptor_t *memory_map_end)
-{
-  grub_efi_memory_descriptor_t *desc;
-  grub_efi_uint64_t total = 0;
-
-  for (desc = memory_map;
-       desc < memory_map_end;
-       desc = NEXT_MEMORY_DESCRIPTOR (desc, desc_size))
-    total += desc->num_pages;
-
-  return total;
-}
-
 /* Add memory regions.  */
-static void
+static grub_err_t
 add_memory_regions (grub_efi_memory_descriptor_t *memory_map,
 		    grub_efi_uintn_t desc_size,
 		    grub_efi_memory_descriptor_t *memory_map_end,
-		    grub_efi_uint64_t required_pages)
+		    grub_efi_uint64_t required_pages,
+		    unsigned int flags)
 {
   grub_efi_memory_descriptor_t *desc;
 
@@ -514,6 +497,10 @@ add_memory_regions (grub_efi_memory_descriptor_t *memory_map,
 
       start = desc->physical_start;
       pages = desc->num_pages;
+
+      if (pages < required_pages && (flags & GRUB_MM_ADD_REGION_CONSECUTIVE))
+	continue;
+
       if (pages > required_pages)
 	{
 	  start += PAGES_TO_BYTES (pages - required_pages);
@@ -522,11 +509,11 @@ add_memory_regions (grub_efi_memory_descriptor_t *memory_map,
 
       addr = grub_efi_allocate_pages_real (start, pages,
 					   GRUB_EFI_ALLOCATE_ADDRESS,
-					   GRUB_EFI_LOADER_CODE);      
+					   GRUB_EFI_LOADER_CODE);
       if (! addr)
-	grub_fatal ("cannot allocate conventional memory %p with %u pages",
-		    (void *) ((grub_addr_t) start),
-		    (unsigned) pages);
+	return grub_error (GRUB_ERR_OUT_OF_MEMORY,
+			    "Memory starting at %p (%u pages) marked as free, but EFI would not allocate",
+			    (void *) ((grub_addr_t) start), (unsigned) pages);
 
       grub_mm_init_region (addr, PAGES_TO_BYTES (pages));
 
@@ -536,7 +523,11 @@ add_memory_regions (grub_efi_memory_descriptor_t *memory_map,
     }
 
   if (required_pages > 0)
-    grub_fatal ("too little memory");
+    return grub_error (GRUB_ERR_OUT_OF_MEMORY,
+                       "could not allocate all requested memory: %" PRIuGRUB_UINT64_T " pages still required after iterating EFI memory map",
+                       required_pages);
+
+  return GRUB_ERR_NONE;
 }
 
 void
@@ -574,8 +565,8 @@ print_memory_map (grub_efi_memory_descriptor_t *memory_map,
 }
 #endif
 
-void
-grub_efi_mm_init (void)
+static grub_err_t
+grub_efi_mm_add_regions (grub_size_t required_bytes, unsigned int flags)
 {
   grub_efi_memory_descriptor_t *memory_map;
   grub_efi_memory_descriptor_t *memory_map_end;
@@ -583,14 +574,13 @@ grub_efi_mm_init (void)
   grub_efi_memory_descriptor_t *filtered_memory_map_end;
   grub_efi_uintn_t map_size;
   grub_efi_uintn_t desc_size;
-  grub_efi_uint64_t total_pages;
-  grub_efi_uint64_t required_pages;
+  grub_err_t err;
   int mm_status;
 
   /* Prepare a memory region to store two memory maps.  */
   memory_map = grub_efi_allocate_any_pages (2 * BYTES_TO_PAGES (MEMORY_MAP_SIZE));
   if (! memory_map)
-    grub_fatal ("cannot allocate memory");
+    return grub_error (GRUB_ERR_OUT_OF_MEMORY, "cannot allocate memory for memory map");
 
   /* Obtain descriptors for available memory.  */
   map_size = MEMORY_MAP_SIZE;
@@ -608,14 +598,14 @@ grub_efi_mm_init (void)
 
       memory_map = grub_efi_allocate_any_pages (2 * BYTES_TO_PAGES (map_size));
       if (! memory_map)
-	grub_fatal ("cannot allocate memory");
+	return grub_error (GRUB_ERR_OUT_OF_MEMORY, "cannot allocate memory for new memory map");
 
       mm_status = grub_efi_get_memory_map (&map_size, memory_map, 0,
 					   &desc_size, 0);
     }
 
   if (mm_status < 0)
-    grub_fatal ("cannot get memory map");
+    return grub_error (GRUB_ERR_OUT_OF_MEMORY, "error fetching memory map from EFI");
 
   memory_map_end = NEXT_MEMORY_DESCRIPTOR (memory_map, map_size);
 
@@ -624,22 +614,17 @@ grub_efi_mm_init (void)
   filtered_memory_map_end = filter_memory_map (memory_map, filtered_memory_map,
 					       desc_size, memory_map_end);
 
-  /* By default, request a quarter of the available memory.  */
-  total_pages = get_total_pages (filtered_memory_map, desc_size,
-				 filtered_memory_map_end);
-  required_pages = (total_pages >> 2);
-  if (required_pages < BYTES_TO_PAGES (MIN_HEAP_SIZE))
-    required_pages = BYTES_TO_PAGES (MIN_HEAP_SIZE);
-  else if (required_pages > BYTES_TO_PAGES (MAX_HEAP_SIZE))
-    required_pages = BYTES_TO_PAGES (MAX_HEAP_SIZE);
-
   /* Sort the filtered descriptors, so that GRUB can allocate pages
      from smaller regions.  */
   sort_memory_map (filtered_memory_map, desc_size, filtered_memory_map_end);
 
   /* Allocate memory regions for GRUB's memory management.  */
-  add_memory_regions (filtered_memory_map, desc_size,
-		      filtered_memory_map_end, required_pages);
+  err = add_memory_regions (filtered_memory_map, desc_size,
+			    filtered_memory_map_end,
+			    BYTES_TO_PAGES (required_bytes),
+			    flags);
+  if (err != GRUB_ERR_NONE)
+    return err;
 
 #if 0
   /* For debug.  */
@@ -657,6 +642,16 @@ grub_efi_mm_init (void)
   /* Release the memory maps.  */
   grub_efi_free_pages ((grub_addr_t) memory_map,
 		       2 * BYTES_TO_PAGES (MEMORY_MAP_SIZE));
+
+  return GRUB_ERR_NONE;
+}
+
+void
+grub_efi_mm_init (void)
+{
+  if (grub_efi_mm_add_regions (DEFAULT_HEAP_SIZE, GRUB_MM_ADD_REGION_NONE) != GRUB_ERR_NONE)
+    grub_fatal ("%s", grub_errmsg);
+  grub_mm_add_region_fn = grub_efi_mm_add_regions;
 }
 
 #if defined (__aarch64__) || defined (__arm__) || defined (__riscv)

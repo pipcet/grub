@@ -146,11 +146,18 @@ check_name_real (const grub_uint8_t *name_at, const grub_uint8_t *head,
 		 int *length, char *set)
 {
   const char *readable_ptr = check_with;
+  int readable_len;
   const grub_uint8_t *ptr;
   char *optr = set;
   int bytes_processed = 0;
   if (length)
     *length = 0;
+
+  if (readable_ptr != NULL)
+    readable_len = grub_strlen (readable_ptr);
+  else
+    readable_len = 0;
+
   for (ptr = name_at; ptr < tail && bytes_processed < tail - head + 2; )
     {
       /* End marker.  */
@@ -172,13 +179,16 @@ check_name_real (const grub_uint8_t *name_at, const grub_uint8_t *head,
 	  ptr = head + (((ptr[0] & 0x3f) << 8) | ptr[1]);
 	  continue;
 	}
-      if (readable_ptr && grub_memcmp (ptr + 1, readable_ptr, *ptr) != 0)
+      if (readable_ptr != NULL && (*ptr > readable_len || grub_memcmp (ptr + 1, readable_ptr, *ptr) != 0))
 	return 0;
-      if (grub_memchr (ptr + 1, 0, *ptr) 
+      if (grub_memchr (ptr + 1, 0, *ptr)
 	  || grub_memchr (ptr + 1, '.', *ptr))
 	return 0;
       if (readable_ptr)
-	readable_ptr += *ptr;
+	{
+	  readable_ptr += *ptr;
+	  readable_len -= *ptr;
+	}
       if (readable_ptr && *readable_ptr != '.' && *readable_ptr != 0)
 	return 0;
       bytes_processed += *ptr + 1;
@@ -192,7 +202,10 @@ check_name_real (const grub_uint8_t *name_at, const grub_uint8_t *head,
       if (optr)
 	*optr++ = '.';
       if (readable_ptr && *readable_ptr)
-	readable_ptr++;
+	{
+	  readable_ptr++;
+	  readable_len--;
+	}
       ptr += *ptr + 1;
     }
   return 0;
@@ -232,7 +245,7 @@ enum
     DNS_CLASS_AAAA = 28
   };
 
-static grub_err_t 
+static grub_err_t
 recv_hook (grub_net_udp_socket_t sock __attribute__ ((unused)),
 	   struct grub_net_buff *nb,
 	   void *data_)
@@ -261,7 +274,7 @@ recv_hook (grub_net_udp_socket_t sock __attribute__ ((unused)),
       grub_netbuff_free (nb);
       return GRUB_ERR_NONE;
     }
-  
+
   if (head->id != data->id)
     {
       grub_netbuff_free (nb);
@@ -615,7 +628,7 @@ grub_net_dns_lookup (const char *name,
   grub_netbuff_free (nb);
   for (j = 0; j < send_servers; j++)
     grub_net_udp_close (sockets[j]);
-  
+
   grub_free (sockets);
 
   if (*data.naddresses)
@@ -623,7 +636,7 @@ grub_net_dns_lookup (const char *name,
   if (data.dns_err)
     return grub_error (GRUB_ERR_NET_NO_DOMAIN,
 		       N_("no DNS record found"));
-    
+
   if (err)
     {
       grub_errno = err;
@@ -667,9 +680,11 @@ grub_cmd_nslookup (struct grub_command *cmd __attribute__ ((unused)),
       grub_net_addr_to_str (&addresses[i], buf);
       grub_printf ("%s\n", buf);
     }
-  grub_free (addresses);
   if (naddresses)
-    return GRUB_ERR_NONE;
+    {
+      grub_free (addresses);
+      return GRUB_ERR_NONE;
+    }
   return grub_error (GRUB_ERR_NET_NO_DOMAIN, N_("no DNS record found"));
 }
 

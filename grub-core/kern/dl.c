@@ -483,7 +483,7 @@ grub_dl_resolve_name (grub_dl_t mod, Elf_Ehdr *e)
   s = grub_dl_find_section (e, ".modname");
   if (!s)
     return grub_error (GRUB_ERR_BAD_MODULE, "no module name found");
-  
+
   mod->name = grub_strdup ((char *) e + s->sh_offset);
   if (! mod->name)
     return grub_errno;
@@ -810,24 +810,4 @@ grub_dl_unload (grub_dl_t mod)
 #endif
   grub_free (mod);
   return 1;
-}
-
-/* Unload unneeded modules.  */
-void
-grub_dl_unload_unneeded (void)
-{
-  /* Because grub_dl_remove modifies the list of modules, this
-     implementation is tricky.  */
-  grub_dl_t p = grub_dl_head;
-
-  while (p)
-    {
-      if (grub_dl_unload (p))
-	{
-	  p = grub_dl_head;
-	  continue;
-	}
-
-      p = p->next;
-    }
 }

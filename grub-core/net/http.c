@@ -68,7 +68,15 @@ parse_line (grub_file_t file, http_data_t data, char *ptr, grub_size_t len)
   char *end = ptr + len;
   while (end > ptr && *(end - 1) == '\r')
     end--;
+
+  /* LF without CR. */
+  if (end == ptr + len)
+    {
+      data->errmsg = grub_strdup (_("invalid HTTP header - LF without CR"));
+      return GRUB_ERR_NONE;
+    }
   *end = 0;
+
   /* Trailing CRLF.  */
   if (data->in_chunk_len == 1)
     {
@@ -145,7 +153,7 @@ parse_line (grub_file_t file, http_data_t data, char *ptr, grub_size_t len)
       return GRUB_ERR_NONE;
     }
 
-  return GRUB_ERR_NONE;  
+  return GRUB_ERR_NONE;
 }
 
 static void
@@ -190,9 +198,7 @@ http_receive (grub_net_tcp_socket_t sock __attribute__ ((unused)),
 	  int have_line = 1;
 	  char *t;
 	  ptr = grub_memchr (nb->data, '\n', nb->tail - nb->data);
-	  if (ptr)
-	    ptr++;
-	  else
+	  if (ptr == NULL)
 	    {
 	      have_line = 0;
 	      ptr = (char *) nb->tail;
@@ -205,7 +211,7 @@ http_receive (grub_net_tcp_socket_t sock __attribute__ ((unused)),
 	      grub_net_tcp_close (data->sock, GRUB_NET_TCP_ABORT);
 	      return grub_errno;
 	    }
-	      
+
 	  data->current_line = t;
 	  grub_memcpy (data->current_line + data->current_line_len,
 		       nb->data, ptr - (char *) nb->data);
@@ -261,7 +267,7 @@ http_receive (grub_net_tcp_socket_t sock __attribute__ ((unused)),
 	{
 	  grub_netbuff_free (nb);
 	  return GRUB_ERR_NONE;
-	} 
+	}
       err = grub_netbuff_pull (nb, ptr - (char *) nb->data);
       if (err)
 	{
@@ -312,6 +318,10 @@ http_establish (struct grub_file *file, grub_off_t offset, int initial)
   int i;
   struct grub_net_buff *nb;
   grub_err_t err;
+  char *server_name;
+  char *port_string;
+  const char *port_string_end;
+  unsigned long port_number;
 
   nb = grub_netbuff_alloc (GRUB_NET_TCP_RESERVE_SIZE
 			   + sizeof ("GET ") - 1
@@ -366,7 +376,7 @@ http_establish (struct grub_file *file, grub_off_t offset, int initial)
 	       grub_strlen (file->device->net->server));
 
   ptr = nb->tail;
-  err = grub_netbuff_put (nb, 
+  err = grub_netbuff_put (nb,
 			  sizeof ("\r\nUser-Agent: " PACKAGE_STRING "\r\n")
 			  - 1);
   if (err)
@@ -390,10 +400,42 @@ http_establish (struct grub_file *file, grub_off_t offset, int initial)
   grub_netbuff_put (nb, 2);
   grub_memcpy (ptr, "\r\n", 2);
 
-  data->sock = grub_net_tcp_open (file->device->net->server,
-				  HTTP_PORT, http_receive,
+  port_string = grub_strrchr (file->device->net->server, ',');
+  if (port_string == NULL)
+    {
+      /* If ",port" is not found in the http server string, look for ":port". */
+      port_string = grub_strrchr (file->device->net->server, ':');
+      /* For IPv6 addresses, the ":port" syntax is not supported and ",port" must be used. */
+      if (port_string != NULL && grub_strchr (file->device->net->server, ':') != port_string)
+	  port_string = NULL;
+    }
+  if (port_string != NULL)
+    {
+      port_number = grub_strtoul (port_string + 1, &port_string_end, 10);
+      if (*(port_string + 1) == '\0' || *port_string_end != '\0')
+	  return grub_error (GRUB_ERR_BAD_NUMBER, N_("non-numeric or invalid port number `%s'"), port_string + 1);
+      if (port_number == 0 || port_number > 65535)
+	  return grub_error (GRUB_ERR_OUT_OF_RANGE, N_("port number `%s' not in the range of 1 to 65535"), port_string + 1);
+
+      server_name = grub_strdup (file->device->net->server);
+      if (server_name == NULL)
+	  return grub_errno;
+      server_name[port_string - file->device->net->server] = '\0';
+    }
+  else
+    {
+      port_number = HTTP_PORT;
+      server_name = file->device->net->server;
+    }
+
+  data->sock = grub_net_tcp_open (server_name,
+				  port_number, http_receive,
 				  http_err, NULL,
 				  file);
+
+  if (server_name != file->device->net->server)
+      grub_free (server_name);
+
   if (!data->sock)
     {
       grub_netbuff_free (nb);
@@ -409,7 +451,7 @@ http_establish (struct grub_file *file, grub_off_t offset, int initial)
       return err;
     }
 
-  for (i = 0; !data->headers_recv && i < 100; i++)
+  for (i = 0; data->sock && !data->headers_recv && i < 100; i++)
     {
       grub_net_tcp_retransmit ();
       grub_net_poll_cards (300, &data->headers_recv);
@@ -417,7 +459,8 @@ http_establish (struct grub_file *file, grub_off_t offset, int initial)
 
   if (!data->headers_recv)
     {
-      grub_net_tcp_close (data->sock, GRUB_NET_TCP_ABORT);
+      if (data->sock)
+        grub_net_tcp_close (data->sock, GRUB_NET_TCP_ABORT);
       if (data->err)
 	{
 	  char *str = data->errmsg;
@@ -542,7 +585,7 @@ http_packets_pulled (struct grub_file *file)
   return 0;
 }
 
-static struct grub_net_app_protocol grub_http_protocol = 
+static struct grub_net_app_protocol grub_http_protocol =
   {
     .name = "http",
     .open = http_open,
